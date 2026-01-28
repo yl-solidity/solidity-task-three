@@ -1,13 +1,21 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol"; // 注意：路径变
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract AuctionMarket is ReetrancyGuard, Ownable {
-    
+/// @title AuctionMarket - NFT 拍卖市场
+/// @author YourName
+/// @notice 支持 NFT 拍卖的交易市场
+contract AuctionMarket is ReentrancyGuard, Ownable {
+    /// @notice 构造函数
+    /// @param initialOwner 合约初始所有者
+    constructor(address initialOwner) Ownable(initialOwner) {}
+
+    // 这里添加你的拍卖逻辑...
+
+    /// @notice 示例函数 - 防止空块警告
+    function initialize() public onlyOwner {
+        // 初始化逻辑
+    }
 }
