@@ -5,8 +5,9 @@ import "./AuctionMarket.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
-contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable {
+contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     // 动态手续费结构
 
     struct DynamicFee {
@@ -17,6 +18,14 @@ contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     DynamicFee[] public dynamicFees;
     uint256 public defaultFeeRate;
+    uint256 public minBidIncreasePercentage; // 最小出价增加百分比
+    uint256 public auctionExtensionTime; // 拍卖结束前出价自动延长时间
+
+    // 事件
+    event DynamicFeeAdded(uint256 minAmount, uint256 maxAmount, uint256 feeRate);
+    event DynamicFeeUpdated(uint256 index, uint256 minAmount, uint256 maxAmount, uint256 feeRate);
+    event MinBidIncreasePercentageUpdated(uint256 newPercentage);
+    event AuctionExtensionTimeUpdated(uint256 newExtensionTime);
 
     /// @custom:oz-upgrates-unsafe-allow constructor
     constructor() {
@@ -29,8 +38,11 @@ contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     function initialize() initializer public {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
+        _ReentrancyGuard_init();
 
         defaultFeeRate = 250; // 2.5%
+        minBidIncreasePercentage = 10; // 10%
+        auctionExtensionTime = 15 minutes;
 
         // 初始化动态手续费等级
         dynamicFees.push(DynamicFee({
@@ -78,6 +90,7 @@ contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable {
             maxAmount: maxAmount,
             feeRate: feeRate
         }))
+        emit DynamicFeeAdded(minAmount, maxAmount, feeRate);
       }
 
       /**
@@ -90,6 +103,7 @@ contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable {
             maxAmount: maxAmount,
             feeRate: feeRate
         })
+        emit DynamicFeeUpdated(index, minAmount, maxAmount, feeRate);
     }
 
     /**
@@ -108,5 +122,73 @@ contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable {
       function getDynamicFeeLevelsCount() external view returns(uint256) {
         return dynamicFees.length;
       }
+
+      // ========== 拍卖增强功能 ==========
+
+      /**
+       * @dev 设置最小出价增加百分比
+       * @param percentage 百分比 (100=1%)
+       */
+       function setMinBidIncreasePercentage(uint256 percentage) external onlyOwner {
+        require(percentage <= 50, "Percentage too hige"); //最大50%
+        minBidIncreasePercentage = percentage;
+        emit MinBidIncreasePercentUpdated(percentage);
+       }
+
+       /**
+        * @dev 设置拍卖延长时间
+        * @param time 延长时间(秒)
+        */
+        function setAuctionExtensionTime(uint256 time) external onlyOwner{
+            require(time <= 1 hours, "Extension time too long");
+            auctionExtensionTime = time;
+            emit AuctionExtenstionTimeUpdated(time);
+        }
+
+        /**
+         * @dev 获取最小出价增加百分比
+         * @return 百分比
+         */
+         function getMinBidIncreasePercenttage() external view returns (uint256) {
+            return minBidIncreasePercentage;
+         }
+
+         /**
+          * @dev 获取拍卖延长时间
+          * @return 延长时间
+          */
+          function getAuctionExtensionTime() external view returns(uint256) {
+            return auctionExtensionTime;
+          }
+
+            // ========== 工具函数 ==========
+
+        /**
+         * @dev 计算最小出价金额
+         * @param currentBid 当前最高出价
+         * @return 最小出价金额
+         */
+         function calculateMinBid(uint256 currentBid) public view returns(uint256) {
+            if(currentBid ==0 ){
+                return 0
+            }
+            return currentBid + (currentBid * minBidIncrasePercentage / 100);
+         }
+
+         /**
+          * @dev 批量获取动态手续费信息
+          * @return 动态手续费信息
+          */
+          function getAllDynamicFeees() external view returns(DynamicFee[]) {
+            return dynamicFees;
+          }
+
+          /**
+           * @dev 获取合约版本
+           * @return 版本字符串
+           */
+           function version() external view returns( string memory){
+            return "2.0.0"
+           }
 
 }

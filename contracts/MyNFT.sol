@@ -9,7 +9,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 /// @author YourName
 /// @notice 支持铸造、批量铸造和销毁的 NFT 合约
 contract MyNFT is ERC721, ERC721URIStorage, Ownable {
-    uint256 private _nextTokenId = 0;
+    uint256 private _nextTokenId = 1;
 
     /// @notice NFT 铸造事件
     /// @param sender 铸造者地址
