@@ -6,7 +6,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "solhint '**/*.sol'",
     "lint:fix": "solhint contracts/*.sol --fix",
-    "format": "prettier --write \"contracts/*.sol\""
+    "format": "prettier --write \"contracts/*.sol\"",
+    "deploy:sepolia": "npx hardhat ignition deploy ignition/modules/AuctionMarketModule.ts --network sepolia"
   },
   "keywords": [],
   "author": "",
