@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import { IERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol"; // 注意：路径变
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 /// @title AuctionMarket - NFT 拍卖市场
 /// @author YourName
@@ -21,7 +24,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     struct Auction {
         uint256 auctionId;
         address nftontract;
-        uint256 tokeId;
+        uint256 tokenId;
         address payable highestBidder;
         address bidToken; // 出价代币地址， address(0)表示ETH
         uint256 highestBid;
@@ -33,11 +36,11 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     // 手续费率（百分比， 100 = 1%）
     uint256 public feeRate = 250; // 2.5%
     address payable public feeRecipient;
+    address[] supportedTokens;
 
     // 映射
     mapping(uint256 => Auction) public auctions;
-    mapping(address => SupportedToken) public supportedToken;
-    mapping(address => mapping(uint256 => uint256)) public nftToAuctionId; // NFT合约地址 + tokeenId => 拍卖ID
+    mapping(address => mapping(uint256 => uint256)) public nftToAuctionId; // NFT合约地址 + tokenId => 拍卖ID
 
     // 事件
 
@@ -96,29 +99,31 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
 
     /**
       * @dev 创建拍卖
-      * @param nftContract
-      * @param tokenId
-      * @param bidToken
-      * @param duration
+      * @param nftContract nft合约地址
+      * @param tokenId NFT代币ID
+      * @param bidToken 出价代币地址
+      * @param duration 拍卖持续时间（秒
       */
-      function createAuction(address nftContract, uint256 tokenId, address bidToken, uint256 duration) {
+      function createAuction(address nftContract, uint256 tokenId, address bidToken, uint256 duration) public {
       require(duration > 0 && duration <= 30 days, "Invalid duration");
       require(supportedTokens[bidToken].isActive, "Bid token not supported");
 
       IERC721 nft = IERC721(nftContract);
       require(nft.ownerOf(tokenId) == msg.sender, "Not NFT owner");
-      require(nft.getApproved(tokeenId) == address(this) || nft.isApprovedForAll(msg.sender, address(this)), "NFT not approved");
+      require(nft.getApproved(tokenId) == address(this) || nft.isApprovedForAll(msg.sender, address(this)), "NFT not approved");
 
       // 转移NFT到合约
       nft.transferFrom(msg.sender, address(this), tokenId);
 
       _auctionIdCounter.increment();
       uint256 auctionId = _auctionIdCounter.current();
+      uint256 startTime =  block.timestamp;
+      uint256 endTime = startTime + duration;
 
       Auction storage auction = auctions[auctionId];
       auction.auctionId = auctionId;
-      auction.nftontract = nftontract;
-      auction.tokeId = tokeId;
+      auction.nftontract = nftContract;
+      auction.tokenId = tokenId;
       auction.seller = payable(msg.sender);
       auction.bidToken = bidToken;
       auction.startTime = startTime;
@@ -127,7 +132,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
 
       nftToAuctionId[nftContract][tokenId] = auctionId;
 
-      emit AuctionCreated(auctionId, nftContract, tokenId, seller, bidToken, block.timestamp, block.timestamp + ducation);
+      emit AuctionCreated(auctionId, nftContract, tokenId, payable(msg.sender), bidToken, startTime, endTime);
       }
 
     /**
@@ -159,7 +164,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
       // 计算USD 价值
       uint256 usdAmount = getBidValueInUSD(auction.bidToken, auction.highestBid);
 
-      emit BidPlaced(auctionId, msg.sender, action.bidToken, amount, usdAmount);
+      emit BidPlaced(auctionId, msg.sender, auction.bidToken, amount, usdAmount);
     }
 
     /**
@@ -188,8 +193,9 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     require(block.timestamp >= auction.endTime || msg.sender == auction.seller, "Auction not ended");
 
     auction.ended = true;
+    address bidToken = auction.bidToken;
 
-    IER721 nft = IER721(auction.nftontract);
+    IERC721 nft = IERC721(auction.nftontract);
     
     if(auction.highestBidder != address(0)){
       // 有出价者
@@ -197,23 +203,23 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
       uint256 sellerAmount = auction.highestBid - fee;
 
       // 转移资金
-      if(auction.bidToken == address(0)){
+      if(bidToken == address(0)){
         //ETH
         (bool feSuccess,) = feeRecipient.call{value: fee}("");
         require((feSuccess, "Seller payment failed"));
       } else {
         // ERC20
-        IERC20 token = IERC20(auction.bidToken);
+        IERC20 token = IERC20(bidToken);
         require(token.transfer(feeRecipient, fee), "Fee transfer failed");
         require(token.transfer(auction.seller, sellerAmount), "Seller payment failed");
       }
 
       // 转移Nft
-      nft.safeTransferFrom(address(this), action.highestBidder, auction.tokeId);
+      nft.safeTransferFrom(address(this), auction.highestBidder, auction.tokenId);
       // 计算USD 价值
-      uint256 usdAmount = getBidValueInUSD(auction.bidToken, auction.highestBid);
+      uint256 usdAmount = getBidValueInUSD(bidToken, auction.highestBid);
 
-      emit BidPlaced(auctionId, msg.sender, action.bidToken, amount, usdAmount);
+      emit BidPlaced(auctionId, msg.sender, bidToken, sellerAmount, usdAmount);
     } else {
       // 没有出价者，退回NFT
       nft.safeTransferFrom(address(this), auction.seller, auctionId.tokenId);
@@ -222,7 +228,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     }
 
     // 清理隐射
-    delete nftToAuctionId[auction.nftontract][auction.tokeId];
+    delete nftToAuctionId[auction.nftontract][auction.tokenId];
     }
 
     /**
@@ -237,7 +243,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     */
     function getActiveAuctionsCount() external view returns(uint256) {
     uint256 count = 0;
-    for(uint256 i=1; i<= _auctionIdCounter.current(), i++){
+    for(uint256 i=1; i<= _auctionIdCounter.current(); i++){
       if(!auctions[i].ended && block.timestamp < auctions[i].endTime){
         count++;
       }
@@ -249,7 +255,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     * @dev 设置手续费率 
     */
     function setFeeRate(uint256 newFeeRate) external onlyOwner {
-      require(newReeRate <= 1000, "Fee rate too hige"); // 最大10%
+      require(newFeeRate <= 1000, "Fee rate too hige"); // 最大10%
       feeRate = newFeeRate;
     }
 
@@ -282,7 +288,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
           require(token.transfer(auction.highestBidder, auction.highestBid), "Token refund failed");
         }
       }
-      emit AuctionEnded(auctionId, address(0), auction.bidToken, 0, 0);
+      emit AuctionsEnded(auctionId, address(0), auction.bidToken, 0, 0);
     }
 
     // 接收ETH
