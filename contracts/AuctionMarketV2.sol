@@ -5,7 +5,7 @@ import "./AuctionMarket.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     // 动态手续费结构
@@ -36,7 +36,7 @@ contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable, 
      * 初始化
      */
     function initialize() initializer public {
-        __Ownable_init();
+        __Ownable_init((msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
 
@@ -132,7 +132,7 @@ contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable, 
        function setMinBidIncreasePercentage(uint256 percentage) external onlyOwner {
         require(percentage <= 50, "Percentage too hige"); //最大50%
         minBidIncreasePercentage = percentage;
-        emit MinBidIncreasePercentageUpdated(percentage);(percentage);
+        emit MinBidIncreasePercentageUpdated(percentage);
        }
 
        /**
@@ -149,7 +149,7 @@ contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable, 
          * @dev 获取最小出价增加百分比
          * @return 百分比
          */
-         function getMinBidIncreasePercenttage() external view returns (uint256) {
+         function getMinBidIncreasePercentage() external view returns (uint256) {
             return minBidIncreasePercentage;
          }
 
@@ -179,7 +179,7 @@ contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable, 
           * @dev 批量获取动态手续费信息
           * @return 动态手续费信息
           */
-          function getAllDynamicFeees() external view returns(DynamicFee[] memory) {
+          function getAllDynamicFees() external view returns(DynamicFee[] memory) {
             return dynamicFees;
           }
 

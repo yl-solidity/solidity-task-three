@@ -24,7 +24,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     struct Auction {
         uint256 auctionId;
         address nftContract;
-        address seller;
+        address payable seller;
         uint256 tokenId;
         address payable highestBidder;
         address bidToken; // 出价代币地址， address(0)表示ETH
@@ -41,13 +41,13 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     // 映射
     mapping(uint256 => Auction) public auctions;
     mapping(address => mapping(uint256 => uint256)) public nftToAuctionId; // NFT合约地址 + tokenId => 拍卖ID
-    mapping(address => SupportedToken) supportedTokens;
+    mapping(address => SupportedToken) public supportedTokens;
 
     // 事件
 
     event AuctionCreated(uint256 indexed auctionId, address indexed nftContract, uint256 indexed tokenId, address seller, address bidToken, uint256 startTime, uint256 endTime);
     event BidPlaced(uint256 indexed auctionId, address indexed bidder, address bidToken, uint256 amount, uint256 usdAmount);
-    event AuctionsEnded(uint256 indexed auctionId, address indexed winner, address bidToken, uint256 amount, uint256 usdAmount);
+    event AuctionEnded(uint256 indexed auctionId, address indexed winner, address bidToken, uint256 amount, uint256 usdAmount);
 
     event TokenSupported(address indexed tokenAddress, address priceFeed);
     event TokenRemoved(address indexed tokenAddress);
@@ -225,7 +225,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
       // 没有出价者，退回NFT
       nft.safeTransferFrom(address(this), auction.seller, auction.tokenId);
 
-      emit AuctionsEnded(auctionId, address(0), bidToken, 0, 0);
+      emit AuctionEnded(auctionId, address(0), bidToken, 0, 0);
     }
 
     // 清理隐射
@@ -289,7 +289,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
           require(token.transfer(auction.highestBidder, auction.highestBid), "Token refund failed");
         }
       }
-      emit AuctionsEnded(auctionId, address(0), auction.bidToken, 0, 0);
+      emit AuctionEnded(auctionId, address(0), auction.bidToken, 0, 0);
     }
 
     // 接收ETH
