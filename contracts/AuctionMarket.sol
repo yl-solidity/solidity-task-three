@@ -23,7 +23,8 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     // 拍卖结构
     struct Auction {
         uint256 auctionId;
-        address nftontract;
+        address nftContract;
+        address seller;
         uint256 tokenId;
         address payable highestBidder;
         address bidToken; // 出价代币地址， address(0)表示ETH
@@ -36,11 +37,11 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     // 手续费率（百分比， 100 = 1%）
     uint256 public feeRate = 250; // 2.5%
     address payable public feeRecipient;
-    address[] supportedTokens;
 
     // 映射
     mapping(uint256 => Auction) public auctions;
     mapping(address => mapping(uint256 => uint256)) public nftToAuctionId; // NFT合约地址 + tokenId => 拍卖ID
+    mapping(address => SupportedToken) supportedTokens;
 
     // 事件
 
@@ -58,8 +59,8 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
 
         // 支持ETH（使用 Sepolia 测试网的ETH/USD 预言机）
 
-        supportedTokens[address[0]] = SupportedToken({
-            tokenAddress: address[0],
+        supportedTokens[address(0)] = SupportedToken({
+            tokenAddress: address(0),
             priceFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306, // Sepolia ETH/USD 预言机
             isActive: true
         });
@@ -74,8 +75,8 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     */
     function addSupportedToken(address tokenAddress, address priceFeed) external onlyOwner {
 
-      require(tokenAddress != address[0], "Invalid token address");
-      require(priceFeed != address[0], "Invalid price feed");
+      require(tokenAddress != address(0), "Invalid token address");
+      require(priceFeed != address(0), "Invalid price feed");
       require(!supportedTokens[tokenAddress].isActive, "Token already supported");
 
         supportedTokens[tokenAddress] = SupportedToken({
@@ -115,14 +116,14 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
       // 转移NFT到合约
       nft.transferFrom(msg.sender, address(this), tokenId);
 
-      _auctionIdCounter.increment();
-      uint256 auctionId = _auctionIdCounter.current();
+      _auctionIdCounter++;
+      uint256 auctionId = _auctionIdCounter;
       uint256 startTime =  block.timestamp;
       uint256 endTime = startTime + duration;
 
       Auction storage auction = auctions[auctionId];
       auction.auctionId = auctionId;
-      auction.nftontract = nftContract;
+      auction.nftContract = nftContract;
       auction.tokenId = tokenId;
       auction.seller = payable(msg.sender);
       auction.bidToken = bidToken;
@@ -142,8 +143,8 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
       Auction storage auction = auctions[auctionId];
       require(auction.auctionId !=0, "Auction not found");
       require(!auction.ended, "Auction ended");
-      require(block.timestamp < auction.endTime, "Aution expired");
-      require(block.timestamp >= auction.startTime, "Aution ont started");
+      require(block.timestamp < auction.endTime, "Auction expired");
+      require(block.timestamp >= auction.startTime, "Auction ont started");
 
       // 检查出价是否高于当前最高出价
       uint256 minBid = auction.highestBid == 0 ? 0 : auction.highestBid + (auction.highestBid * 10/100); // 至少高出10%
@@ -154,7 +155,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
 
         // 退回前一个最高出价者的ETH
         if(auction.highestBidder != address(0)) {
-          (bool success,) = auction.highestBidder.call{value: auction.highestBid};
+          (bool success,) = auction.highestBidder.call{value: auction.highestBid}("");
           require(success, "ETH refund failed");
         }
         auction.highestBid = msg.value;
@@ -175,7 +176,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
       require(supportedToken.isActive, "Token not supported");
 
       AggregatorV3Interface priceFeed = AggregatorV3Interface(supportedToken.priceFeed);
-      (,int256 price,,,) = priceFeed.latesRoundData();
+      (,int256 price,,,) = priceFeed.latestRoundData();
 
       // price 通常有8位小数， amount 有18位小数
       // 计算： amount * price/1e8
@@ -195,7 +196,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     auction.ended = true;
     address bidToken = auction.bidToken;
 
-    IERC721 nft = IERC721(auction.nftontract);
+    IERC721 nft = IERC721(auction.nftContract);
     
     if(auction.highestBidder != address(0)){
       // 有出价者
@@ -206,7 +207,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
       if(bidToken == address(0)){
         //ETH
         (bool feSuccess,) = feeRecipient.call{value: fee}("");
-        require((feSuccess, "Seller payment failed"));
+        require(feSuccess, "Seller payment failed");
       } else {
         // ERC20
         IERC20 token = IERC20(bidToken);
@@ -222,13 +223,13 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
       emit BidPlaced(auctionId, msg.sender, bidToken, sellerAmount, usdAmount);
     } else {
       // 没有出价者，退回NFT
-      nft.safeTransferFrom(address(this), auction.seller, auctionId.tokenId);
+      nft.safeTransferFrom(address(this), auction.seller, auction.tokenId);
 
       emit AuctionsEnded(auctionId, address(0), bidToken, 0, 0);
     }
 
     // 清理隐射
-    delete nftToAuctionId[auction.nftontract][auction.tokenId];
+    delete nftToAuctionId[auction.nftContract][auction.tokenId];
     }
 
     /**
@@ -243,7 +244,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     */
     function getActiveAuctionsCount() external view returns(uint256) {
     uint256 count = 0;
-    for(uint256 i=1; i<= _auctionIdCounter.current(); i++){
+    for(uint256 i=1; i<= _auctionIdCounter; i++){
       if(!auctions[i].ended && block.timestamp < auctions[i].endTime){
         count++;
       }
@@ -262,7 +263,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
   /**
     * 设置手续费接收者
     */
-    function setFeeRecippient(address newRecipient) external onlyOwner{
+    function setFeeRecipient(address payable newRecipient) external onlyOwner{
     require(newRecipient != address(0), "Invalid recipient");
     feeRecipient = newRecipient;
     }
@@ -276,7 +277,7 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
 
       auction.ended = true;
 
-      IERC721 nft = IERC721(auction.nftContract);
+      // IERC721 nft = IERC721(auction.nftContract);
 
       // 退回NFT给卖家
       if(auction.highestBidder != address(0)){
