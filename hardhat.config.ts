@@ -1,5 +1,6 @@
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable, defineConfig } from "hardhat/config";
+import "@nomicfoundation/hardhat-viem"; // 显式导入 viem 插件
 
 export default defineConfig({
   plugins: [hardhatToolboxViemPlugin],
@@ -34,5 +35,11 @@ export default defineConfig({
       url: configVariable("SEPOLIA_RPC_URL"),
       accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
     },
+        // 本地开发网络（EDR模拟器）
+        hardhat: {
+          type: "edr-simulated",
+          chainType: "l1",
+          chainId: 31337,
+        },
   },
 });
