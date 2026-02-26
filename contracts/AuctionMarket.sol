@@ -139,34 +139,51 @@ contract AuctionMarket is ReentrancyGuard, Ownable {
     /**
     * @dev 出价 
     */
-    function placeBid(uint256 auctionId, uint256 amount) external payable nonReentrant {
-      Auction storage auction = auctions[auctionId];
-      require(auction.auctionId !=0, "Auction not found");
-      require(!auction.ended, "Auction ended");
-      require(block.timestamp < auction.endTime, "Auction expired");
-      require(block.timestamp >= auction.startTime, "Auction ont started");
+function placeBid(uint256 auctionId, uint256 amount) external payable nonReentrant {
+    Auction storage auction = auctions[auctionId];
+    require(auction.auctionId != 0, "Auction not found");
+    require(!auction.ended, "Auction ended");
+    require(block.timestamp < auction.endTime, "Auction expired");
+    require(block.timestamp >= auction.startTime, "Auction not started");
 
-      // 检查出价是否高于当前最高出价
-      uint256 minBid = auction.highestBid == 0 ? 0 : auction.highestBid + (auction.highestBid * 10/100); // 至少高出10%
-      if(auction.bidToken == address(0)){
+    // 检查出价是否高于当前最高出价
+    uint256 minBid = auction.highestBid == 0 ? 0 : auction.highestBid + (auction.highestBid * 10 / 100); // 至少高出10%
+    
+    if (auction.bidToken == address(0)) {
         // ETH出价
         require(msg.value >= minBid, "Bid too low");
         require(msg.value >= amount, "Insufficient ETH");
 
         // 退回前一个最高出价者的ETH
-        if(auction.highestBidder != address(0)) {
-          (bool success,) = auction.highestBidder.call{value: auction.highestBid}("");
-          require(success, "ETH refund failed");
+        if (auction.highestBidder != address(0)) {
+            (bool success,) = auction.highestBidder.call{value: auction.highestBid}("");
+            require(success, "ETH refund failed");
         }
         auction.highestBid = msg.value;
-      }
-      auction.highestBidder = payable(msg.sender);
-
-      // 计算USD 价值
-      uint256 usdAmount = getBidValueInUSD(auction.bidToken, auction.highestBid);
-
-      emit BidPlaced(auctionId, msg.sender, auction.bidToken, amount, usdAmount);
+        auction.highestBidder = payable(msg.sender);
+    } else {
+        // ERC20出价
+        require(amount >= minBid, "Bid too low");
+        
+        IERC20 token = IERC20(auction.bidToken);
+        
+        // 退回前一个最高出价者的代币
+        if (auction.highestBidder != address(0)) {
+            require(token.transfer(auction.highestBidder, auction.highestBid), "Token refund failed");
+        }
+        
+        // 从出价者转移代币到合约
+        require(token.transferFrom(msg.sender, address(this), amount), "Token transfer failed");
+        
+        auction.highestBid = amount;
+        auction.highestBidder = payable(msg.sender);
     }
+
+    // 计算USD价值
+    uint256 usdAmount = getBidValueInUSD(auction.bidToken, auction.highestBid);
+
+    emit BidPlaced(auctionId, msg.sender, auction.bidToken, amount, usdAmount);
+}
 
     /**
     * @dev 获取出价的USD价值
