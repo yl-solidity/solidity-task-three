@@ -9,7 +9,8 @@
     "format": "prettier --write \"contracts/*.sol\"",
     "deploy:market": "npx hardhat ignition deploy ignition/modules/AuctionMarketModule.ts --network sepolia",
     "deploy:marketv2": "npx hardhat ignition deploy ignition/modules/AuctionMarketV2Module.ts --network sepolia",
-    "deploy:mynft": "npx hardhat ignition deploy ignition/modules/MyNFTModule.ts --network sepolia"
+    "deploy:mynft": "npx hardhat ignition deploy ignition/modules/MyNFTModule.ts --network sepolia",
+    "deploy:proxy": "npx hardhat ignition deploy ignition/modules/AuctionMarketProxyModule.ts --network sepolia"
   },
   "keywords": [],
   "author": "",

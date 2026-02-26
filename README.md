@@ -112,10 +112,11 @@ npm run deploy:marketv2
 ## 部署地址
 
 ### Sepolia 测试网部署地址
-- **MyNFT**: `0x...` (部署后更新)
-- **AuctionMarket Proxy**: `0x...` (部署后更新)
-- **AuctionMarket V1 Implementation**: `0x...` (部署后更新)
-- **AuctionMarket V2 Implementation**: `0x...` (部署后更新)
+- MyNFTModule#MyNFT - 0xD837da692D9541f98CDeA7bfe7C09a20e7C6a95d
+- AuctionMarketModule#AuctionMarket - 0x6d30e15C4A9E8B9183aeE1c3C62280DfA5736A17
+- AuctionMarketV2Module#AuctionMarketV2 - 0x2242D3B558AFc8e4ae346cc9063375d1d2B24746
+- AuctionMarketProxyModule#AuctionMarketV2 - 0x90B3F87bC9D04EB682e0938a7F325101D591Aa1e
+- AuctionMarketProxyModule#AuctionMarketProxy - 0xd1bB2c65f4575eF6F9bae8dB8b965c87870dE54a
 
 ## 使用指南
 
