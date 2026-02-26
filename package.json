@@ -7,7 +7,9 @@
     "lint": "solhint '**/*.sol'",
     "lint:fix": "solhint contracts/*.sol --fix",
     "format": "prettier --write \"contracts/*.sol\"",
-    "deploy:sepolia": "npx hardhat ignition deploy ignition/modules/AuctionMarketModule.ts --network sepolia"
+    "deploy:market": "npx hardhat ignition deploy ignition/modules/AuctionMarketModule.ts --network sepolia",
+    "deploy:marketv2": "npx hardhat ignition deploy ignition/modules/AuctionMarketV2Module.ts --network sepolia",
+    "deploy:mynft": "npx hardhat ignition deploy ignition/modules/MyNFTModule.ts --network sepolia"
   },
   "keywords": [],
   "author": "",

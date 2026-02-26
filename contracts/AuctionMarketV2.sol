@@ -36,7 +36,7 @@ contract AuctionMarketV2 is Initializable, OwnableUpgradeable, UUPSUpgradeable, 
      * 初始化
      */
     function initialize() initializer public {
-        __Ownable_init((msg.sender);
+        __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
 
